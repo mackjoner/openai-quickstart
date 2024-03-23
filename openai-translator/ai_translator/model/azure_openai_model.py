@@ -3,34 +3,24 @@ import openai
 
 from model import Model
 from utils import LOG
-from openai import OpenAI
+from openai import AzureOpenAI
 
-class OpenAIModel(Model):
-    def __init__(self, model: str, api_key: str):
+class AzureOpenAIModel(Model):
+    def __init__(self, model: str, api_key: str, api_version: str, api_url: str):
         self.model = model
-        self.client = OpenAI(api_key=api_key)
+        self.client = AzureOpenAI(api_key=api_key, api_version=api_version, azure_endpoint=api_url)
 
     def make_request(self, prompt):
         attempts = 0
         while attempts < 3:
             try:
-                if self.model == "gpt-3.5-turbo":
-                    response = self.client.chat.completions.create(
-                        model=self.model,
-                        messages=[
-                            {"role": "user", "content": prompt}
-                        ]
-                    )
-                    translation = response.choices[0].message.content.strip()
-                else:
-                    response = self.client.completions.create(
-                        model=self.model,
-                        prompt=prompt,
-                        max_tokens=150,
-                        temperature=0
-                    )
-                    translation = response.choices[0].text.strip()
-
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                translation = response.choices[0].message.content.strip()
                 return translation, True
             except openai.RateLimitError as e:
                 attempts += 1

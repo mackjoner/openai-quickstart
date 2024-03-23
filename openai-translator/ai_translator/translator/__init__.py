@@ -1,1 +1,3 @@
 from .pdf_translator import PDFTranslator
+from .pdf_translator_langchain import PDFTranslatorLangChain
+from .translation_config import TranslationConfig

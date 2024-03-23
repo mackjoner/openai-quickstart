@@ -7,3 +7,9 @@ pillow
 reportlab
 pandas
 loguru
+tabulate
+langchain
+langchain-anthropic
+anthropic
+gradio
+flask

@@ -1,4 +1,5 @@
 import os
+import re
 from reportlab.lib import colors, pagesizes, units
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -14,20 +15,26 @@ class Writer:
     def __init__(self):
         pass
 
-    def save_translated_book(self, book: Book, output_file_path: str = None, file_format: str = "PDF"):
-        if file_format.lower() == "pdf":
-            self._save_translated_book_pdf(book, output_file_path)
-        elif file_format.lower() == "markdown":
-            self._save_translated_book_markdown(book, output_file_path)
+    def save_translated_book(self, book: Book, ouput_file_format: str):
+        LOG.debug(ouput_file_format)
+
+        if ouput_file_format.lower() == "pdf":
+            output_file_path = self._save_translated_book_pdf(book)
+        elif ouput_file_format.lower() == "markdown":
+            output_file_path = self._save_translated_book_markdown(book)
         else:
-            raise ValueError(f"Unsupported file format: {file_format}")
+            LOG.error(f"不支持文件类型: {ouput_file_format}")
+            return "", ""
+
+        LOG.info(f"翻译完成，文件保存至: {output_file_path}")
+        content = self._read_translated_book_content(book)
+        return output_file_path, content
 
     def _save_translated_book_pdf(self, book: Book, output_file_path: str = None):
-        if output_file_path is None:
-            output_file_path = book.pdf_file_path.replace('.pdf', f'_translated.pdf')
 
-        LOG.info(f"pdf_file_path: {book.pdf_file_path}")
-        LOG.info(f"开始翻译: {output_file_path}")
+        output_file_path = book.pdf_file_path.replace('.pdf', f'_translated.pdf')
+
+        LOG.info(f"开始导出: {output_file_path}")
 
         # Register Chinese font
         font_path = "../fonts/simsun.ttc"  # 请将此路径替换为您的字体文件路径
@@ -74,14 +81,12 @@ class Writer:
 
         # Save the translated book as a new PDF file
         doc.build(story)
-        LOG.info(f"翻译完成: {output_file_path}")
+        return output_file_path
 
     def _save_translated_book_markdown(self, book: Book, output_file_path: str = None):
-        if output_file_path is None:
-            output_file_path = book.pdf_file_path.replace('.pdf', f'_translated.md')
+        output_file_path = book.pdf_file_path.replace('.pdf', f'_translated.md')
 
-        LOG.info(f"pdf_file_path: {book.pdf_file_path}")
-        LOG.info(f"开始翻译: {output_file_path}")
+        LOG.info(f"开始导出: {output_file_path}")
         with open(output_file_path, 'w', encoding='utf-8') as output_file:
             # Iterate over the pages and contents
             for page in book.pages:
@@ -95,14 +100,43 @@ class Writer:
                         elif content.content_type == ContentType.TABLE:
                             # Add table to the Markdown file
                             table = content.translation
-                            header = '| ' + ' | '.join(str(column) for column in table.columns) + ' |' + '\n'
-                            separator = '| ' + ' | '.join(['---'] * len(table.columns)) + ' |' + '\n'
-                            # body = '\n'.join(['| ' + ' | '.join(row) + ' |' for row in table.values.tolist()]) + '\n\n'
-                            body = '\n'.join(['| ' + ' | '.join(str(cell) for cell in row) + ' |' for row in table.values.tolist()]) + '\n\n'
-                            output_file.write(header + separator + body)
+                            output_file.write(table.to_markdown(index=False) + '\n')
+                            # header = '| ' + ' | '.join(str(column) for column in table.columns) + ' |' + '\n'
+                            # separator = '| ' + ' | '.join(['---'] * len(table.columns)) + ' |' + '\n'
+                            # # body = '\n'.join(['| ' + ' | '.join(row) + ' |' for row in table.values.tolist()]) + '\n\n'
+                            # body = '\n'.join(['| ' + ' | '.join(str(cell) for cell in row) + ' |' for row in table.values.tolist()]) + '\n\n'
+                            # output_file.write(header + separator + body)
+                            # data = list()
+                            # for column in table.columns:
+                            #     data.append(column)
+                            # for row in table.values.tolist():
+                            #     data.append(row)
+                            # # header = data[0].split(',')
+                            # header = re.split(r'[,，]', data[0])
+                            # table_header = '|' + '|'.join([' ' + col + ' ' for col in header]) + '|'
+                            # table_separator = '|' + '|'.join([' ----- ' for _ in header]) + '|'
+                            # markdown_table = [table_header, table_separator]
+                            # for row in data[1:]:
+                            #     # row_data = row[0].split(',')
+                            #     row_data = re.split(r'[,，]', row[0])
+                            #     row_formatted = '|' + '|'.join([' ' + str(value) + ' ' for value in row_data]) + '|'
+                            #     markdown_table.append(row_formatted)
+                            # for line in markdown_table:
+                            #     output_file.write(line + '\n')
 
                 # Add a page break (horizontal rule) after each page except the last one
                 if page != book.pages[-1]:
                     output_file.write('---\n\n')
 
-        LOG.info(f"翻译完成: {output_file_path}")
+        return output_file_path
+
+    def _read_translated_book_content(self, book: Book, output_content: str = None):
+        txt = ""
+        for page in book.pages:
+            for content in page.contents:
+                if content.status:
+                    if content.content_type == ContentType.TEXT:
+                        txt += content.translation + '\n'
+                    elif content.content_type == ContentType.TABLE:
+                        txt += content.translation.to_markdown(index=False) + '\n'
+        return txt
