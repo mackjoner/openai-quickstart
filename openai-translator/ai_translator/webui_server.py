@@ -46,10 +46,11 @@ def launch_gradio():
             gr.File(label="下载翻译文件"),
             gr.TextArea(label="翻译内容")
         ],
+        theme="soft",
         allow_flagging="never"
     )
 
-    iface.launch()
+    iface.launch(server_name="0.0.0.0")
 
 def initialize_translator():
     # 解析命令行
