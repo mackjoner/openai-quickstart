@@ -1,7 +1,10 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.chat_models import AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
+from langchain.schema.messages import AIMessage
+from langchain_community.llms.chatglm3 import ChatGLM3
 from langchain.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
 
 from langchain.prompts.chat import (
     ChatPromptTemplate,
@@ -32,6 +35,14 @@ class TranslationChain:
             [system_message_prompt, human_message_prompt]
         )
 
+        # for ChatGLM3
+        messages = [
+            AIMessage(content="You are a translation expert, proficient in various languages. The translated content needs to keep the symbols in the original, i.e. [], ()."),
+            # AIMessage(content="欢迎问我任何问题。"),
+        ]
+        human_template = """Translates {source_language} to {target_language}.\n{text}"""
+        prompt = PromptTemplate.from_template(human_template)
+
         # 为了翻译结果的稳定性，将 temperature 设置为 0
         if api_type == "azure":
             print("Using Azure API")
@@ -40,11 +51,17 @@ class TranslationChain:
         elif api_type == "claude":
             print("Using Anthropic API")
             llm = ChatAnthropic(model_name=model_name, temperature=0, verbose=verbose)
+        elif api_type == "chatglm3":
+            print("Using ChatGLM3 API")
+            # ChatGLM3的部署参考
+            # https://github.com/THUDM/ChatGLM3/tree/main/openai_api_demo
+            llm = ChatGLM3(model_name="chatglm3-6b", endpoint_url="http://127.0.0.1:11344/v1/chat/completions", prefix_messages=messages, max_tokens=16000)
+            # llm = OpenAI(api_key="", base_url="http://127.0.0.1:11344/v1/")
         else:
             print("Using OpenAI API")
             llm = ChatOpenAI(model_name=model_name, temperature=0, verbose=verbose)
 
-        self.chain = LLMChain(llm=llm, prompt=chat_prompt_template, verbose=verbose)
+        self.chain = LLMChain(llm=llm, prompt=prompt, verbose=verbose)
 
     def run(self, text: str, source_language: str, target_language: str) -> (str, bool):
         result = ""

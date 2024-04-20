@@ -20,6 +20,7 @@ class Content:
     def set_translation(self, translation, status):
         if not self.check_translation_type(translation):
             raise ValueError(f"Invalid translation type. Expected {self.content_type}, but got {type(translation)}")
+        LOG.debug(f"TEXT [translation]\n{translation}")
         self.translation = translation
         self.status = status
 
@@ -51,7 +52,7 @@ class TableContent(Content):
             if not isinstance(translation, str):
                 raise ValueError(f"Invalid translation type. Expected str, but got {type(translation)}")
 
-            LOG.debug(f"[translation]\n{translation}")
+            LOG.debug(f"TABLE [translation]\n{translation}")
             # Extract column names from the first set of brackets
             # header = translation.split(']')[0][1:].split(', ')
             header = re.split(r'[,，]', translation.split(']')[0][1:])

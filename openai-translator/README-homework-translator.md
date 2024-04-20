@@ -95,7 +95,7 @@ python ai_translator/main.py --model_type GLMModel --glm_model_url $GLM_MODEL_UR
 ```yaml
 model_name: "gpt-3.5-turbo" # gpt-3.5-turbo, gpt-4, claude-3-sonnet-20240229...
 deployment_name: "" # azure openai model deployment name, e.g. openai-gpt4
-api_type: "openai" # openai, claude, azure
+api_type: "openai" # openai, claude, azure, chatglm3
 input_file: "tests/test.pdf"
 output_file_format: "markdown" # pdf, markdown
 source_language: "English"
@@ -125,6 +125,36 @@ python ai_translator/webui_server.py --config_file config_dev.yaml
 ```
 
 ![gui_out](images/translator_homework.png)
+
+## 接入ChatGLM3
+
+1. 配置 ChatGLM3 模型：
+```bash
+export HF_HUB_CACHE=/data/huggingface/hub
+huggingface-cli download THUDM/chatglm3-6b
+huggingface-cli download BAAI/bge-m3
+git clone https://github.com/THUDM/ChatGLM3.git
+conda create -n chatglm3 python=3.11
+conda activate chatglm3
+pip install -r requirements.txt
+```
+
+如果显卡显存不够，可以尝试使用量化（可选）
+```python
+model = AutoModel.from_pretrained(MODEL_PATH, trust_remote_code=True).cuda()
+model = model.quantize(4)
+```
+
+2. 启动 ChatGLM3 API
+```bash
+python openai_api_demo/api_server.py
+```
+
+3. 测试 ChatGLM3 的翻译
+![](images/translator_v2.1.png)
+![](images/translator_web_server.png)
+![](images/chatglm3_api_server.png)
+
 
 ## 许可证
 

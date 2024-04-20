@@ -1,6 +1,8 @@
 import sys
 import os
 import gradio as gr
+import asyncio
+from functools import partial
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -21,18 +23,28 @@ languages = [
 
 file_formats = ['PDF', 'Markdown']
 
-def translation(input_file, source_language, target_language, file_format):
+# 兼容FastAPI写的异步API
+async def translation(input_file, source_language, target_language, file_format):
     LOG.debug(f"[翻译任务]\n源文件: {input_file.name}\n源语言: {source_language}\n目标语言: {target_language}\n文件格式: {file_format}")
-
-    output_file_path, content = Translator.translate_pdf(
-        input_file.name, source_language=source_language, target_language=target_language, output_file_format=file_format)
+    #output_file_path, content = Translator.translate_pdf(
+    #    input_file.name, source_language=source_language, target_language=target_language, output_file_format=file_format)
+    loop = asyncio.get_event_loop()
+    translate_pdf_partial = partial(
+        Translator.translate_pdf,
+        input_file.name,
+        source_language=source_language,
+        target_language=target_language,
+        output_file_format=file_format
+    )
+    output_file_path, content = await loop.run_in_executor(None, translate_pdf_partial)
 
     return output_file_path, content
 
 def launch_gradio():
-
+    async def translation_wrapper(*args):
+        return await translation(*args)
     iface = gr.Interface(
-        fn=translation,
+        fn=translation_wrapper,
         title="OpenAI-Translator v2.0(PDF 电子书翻译工具)",
         inputs=[
             gr.File(label="上传PDF文件"),
@@ -49,7 +61,7 @@ def launch_gradio():
         allow_flagging="never"
     )
 
-    iface.launch()
+    iface.launch(server_name="0.0.0.0")
 
 def initialize_translator():
     # 解析命令行
