@@ -15,11 +15,6 @@ streamlit run --server.address 127.0.0.1 characterglm_api_demo_streamlit.py
 
 ![](./images/image_style.png)
 
-### 用文章内容生成人物和人物特征
-
-![](./images/chatglm.png)
-
-
-### 用角色在characterglm模型上多轮对话
+### 用文章内容生成人物和人物特征后在characterglm模型上多轮对话
 
 ![](./images/characterglm.png)

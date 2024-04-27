@@ -19,13 +19,15 @@ from typing import Iterator, Optional
 
 import streamlit as st
 from dotenv import load_dotenv
+
 # 通过.env文件设置环境变量
 # reference: https://github.com/theskumar/python-dotenv
 load_dotenv()
 
 import api
-from api import generate_chat_scene_prompt, generate_role_appearance, get_characterglm_response, generate_cogview_image, generate_role_appearance_markdown
-from data_types import TextMsg, ImageMsg, TextMsgList, MsgList, filter_text_msg
+from api import generate_chat_scene_prompt, generate_role_appearance, get_characterglm_response, generate_cogview_image, \
+    generate_role_appearance_markdown
+from data_types import TextMsg, ImageMsg, TextMsgList, MsgList, filter_text_msg, CharacterMeta
 
 st.set_page_config(page_title="CharacterGLM API Demo", page_icon="🤖", layout="wide")
 debug = os.getenv("DEBUG", "").lower() in ("1", "yes", "y", "true", "t", "on")
@@ -38,10 +40,11 @@ def update_api_key(key: Optional[str] = None):
     if key:
         api.API_KEY = key
 
-# 设置API KEY
-api_key = st.sidebar.text_input("API_KEY", value=os.getenv("API_KEY", ""), key="API_KEY", type="password", on_change=update_api_key)
-update_api_key(api_key)
 
+# 设置API KEY
+api_key = st.sidebar.text_input("API_KEY", value=os.getenv("API_KEY", ""), key="API_KEY", type="password",
+                                on_change=update_api_key)
+update_api_key(api_key)
 
 # 初始化
 if "history" not in st.session_state:
@@ -53,6 +56,8 @@ if "meta" not in st.session_state:
         "bot_name": "",
         "user_name": ""
     }
+if "role_prompt" not in st.session_state:
+    st.session_state["role_prompt"] = ""
 
 
 def init_session():
@@ -62,7 +67,7 @@ def init_session():
 # 4个输入框，设置meta的4个字段
 meta_labels = {
     "bot_name": "角色名",
-    "user_name": "用户名", 
+    "user_name": "用户名",
     "bot_info": "角色人设",
     "user_info": "用户人设"
 }
@@ -73,28 +78,50 @@ options = ["水墨画", "水彩画", "像素画", "赛博朋克", "科幻风格"
 with st.container():
     # col1 = st.columns(1)
     # with col1:
-    st.text_area(label="文章内容", key="txt", on_change=lambda : st.session_state["txt"], help="提供文本生成角色和人设")
+    st.text_area(label="文章内容", key="txt", on_change=lambda: st.session_state["txt"], help="提供文本生成角色和人设")
 
 with st.container():
-    col1, _, _ = st.columns(3)
+    col1, col2, _ = st.columns(3)
     with col1:
         gen_role_appearance = st.button("生成角色和人设", key="gen_role_appearance")
+    with col2:
+        auto_chat = st.button("人物角色自动对话", key="auto_chat")
+
+
+def new_role():
+    role_prompt = "".join(generate_role_appearance_markdown(st.session_state["txt"]))
+    st.markdown(role_prompt)
+
+
+if gen_role_appearance:
+    new_role()
 
 # 2x2 layout
 with st.container():
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input(label="角色名", key="bot_name", on_change=lambda : st.session_state["meta"].update(bot_name=st.session_state["bot_name"]), help="模型所扮演的角色的名字，不可以为空")
-        st.text_area(label="角色人设", key="bot_info", on_change=lambda : st.session_state["meta"].update(bot_info=st.session_state["bot_info"]), help="角色的详细人设信息，不可以为空")
-        
+        st.text_input(label="角色名", key="bot_name",
+                      on_change=lambda: st.session_state["meta"].update(bot_name=st.session_state["bot_name"]),
+                      help="模型所扮演的角色的名字，不可以为空")
+        st.text_area(label="角色人设", key="bot_info",
+                     on_change=lambda: st.session_state["meta"].update(bot_info=st.session_state["bot_info"]),
+                     help="角色的详细人设信息，不可以为空")
+
     with col2:
-        st.text_input(label="用户名", value="用户", key="user_name", on_change=lambda : st.session_state["meta"].update(user_name=st.session_state["user_name"]), help="用户的名字，默认为用户")
-        st.text_area(label="用户人设", value="", key="user_info", on_change=lambda : st.session_state["meta"].update(user_info=st.session_state["user_info"]), help="用户的详细人设信息，可以为空")
+        st.text_input(label="用户名", value="用户", key="user_name",
+                      on_change=lambda: st.session_state["meta"].update(user_name=st.session_state["user_name"]),
+                      help="用户的名字，默认为用户")
+        st.text_area(label="用户人设", value="", key="user_info",
+                     on_change=lambda: st.session_state["meta"].update(user_info=st.session_state["user_info"]),
+                     help="用户的详细人设信息，可以为空")
 
 with st.container():
     col1, _, _, _ = st.columns(4)
     with col1:
-        st.selectbox(label="图片风格", options=options, key="image_style", on_change=lambda : st.session_state["meta"].update(image_style=st.session_state["image_style"]), help="图片风格，默认为水墨画")
+        st.selectbox(label="图片风格", options=options, key="image_style",
+                     on_change=lambda: st.session_state["meta"].update(image_style=st.session_state["image_style"]),
+                     help="图片风格，默认为水墨画")
+
 
 def verify_meta() -> bool:
     # 检查`角色名`和`角色人设`是否空，若为空，则弹出提醒
@@ -104,9 +131,6 @@ def verify_meta() -> bool:
     else:
         return True
 
-def new_role():
-    prompt = "".join(generate_role_appearance_markdown(st.session_state["txt"]))
-    print(prompt)
 
 def draw_new_image():
     """生成一张图片，并展示在页面上"""
@@ -117,21 +141,21 @@ def draw_new_image():
         # 若有对话历史，则结合角色人设和对话历史生成图片
         image_prompt = "".join(
             generate_chat_scene_prompt(
-                text_messages[-10: ],
+                text_messages[-10:],
                 meta=st.session_state["meta"]
             )
         )
     else:
         # 若没有对话历史，则根据角色人设生成图片
         image_prompt = "".join(generate_role_appearance(st.session_state["meta"]["bot_info"]))
-    
+
     if not image_prompt:
         st.error("调用chatglm生成Cogview prompt出错")
         return
-    
+
     # TODO: 加上风格选项
     image_prompt = '[' + st.session_state["image_style"] + ']' + image_prompt.strip()
-    
+
     print(f"image_prompt = {image_prompt}")
     n_retry = 3
     st.markdown("正在生成图片，请稍等...")
@@ -172,7 +196,7 @@ with st.container():
     n_button = len(button_labels)
     cols = st.columns(n_button)
     button_key_to_col = dict(zip(button_labels.keys(), cols))
-    
+
     with button_key_to_col["clear_meta"]:
         clear_meta = st.button(button_labels["clear_meta"], key="clear_meta")
         if clear_meta:
@@ -189,7 +213,7 @@ with st.container():
         if clear_history:
             init_session()
             st.rerun()
-    
+
     with button_key_to_col["gen_picture"]:
         gen_picture = st.button(button_labels["gen_picture"], key="gen_picture")
 
@@ -198,38 +222,19 @@ with st.container():
             show_api_key = st.button(button_labels["show_api_key"], key="show_api_key")
             if show_api_key:
                 print(f"API_KEY = {api.API_KEY}")
-        
+
         with button_key_to_col["show_meta"]:
             show_meta = st.button(button_labels["show_meta"], key="show_meta")
             if show_meta:
                 print(f"meta = {st.session_state['meta']}")
-        
+
         with button_key_to_col["show_history"]:
             show_history = st.button(button_labels["show_history"], key="show_history")
             if show_history:
                 print(f"history = {st.session_state['history']}")
 
-
-# 展示对话历史
-for msg in st.session_state["history"]:
-    if msg["role"] == "user":
-        with st.chat_message(name="user", avatar="user"):
-            st.markdown(msg["content"])
-    elif msg["role"] == "assistant":
-        with st.chat_message(name="assistant", avatar="assistant"):
-            st.markdown(msg["content"])
-    elif msg["role"] == "image":
-        with st.chat_message(name="assistant", avatar="assistant"):
-            st.image(msg["image"], caption=msg.get("caption", None))
-    else:
-        raise Exception("Invalid role")
-
-if gen_role_appearance:
-    new_role()
-
 if gen_picture:
     draw_new_image()
-
 
 with st.chat_message(name="user", avatar="user"):
     input_placeholder = st.empty()
@@ -256,14 +261,51 @@ def start_chat():
 
         input_placeholder.markdown(query)
         st.session_state["history"].append(TextMsg({"role": "user", "content": query}))
-        
-        response_stream = get_characterglm_response(filter_text_msg(st.session_state["history"]), meta=st.session_state["meta"])
+
+        response_stream = get_characterglm_response(filter_text_msg(st.session_state["history"]),
+                                                    meta=st.session_state["meta"])
         bot_response = output_stream_response(response_stream, message_placeholder)
         if not bot_response:
             message_placeholder.markdown("生成出错")
             st.session_state["history"].pop()
         else:
             st.session_state["history"].append(TextMsg({"role": "assistant", "content": bot_response}))
-            
-    
+
+
+if auto_chat:
+    init_session()
+    n = 5
+    count = 0
+    query = st.session_state["meta"]["bot_name"]+"，几日不见，如隔三秋。"
+    input_placeholder.markdown(query)
+    st.session_state["history"].append(TextMsg({"role": "user", "content": query}))
+    while count < n:
+        response_stream = get_characterglm_response(filter_text_msg(st.session_state["history"]),
+                                                    meta=st.session_state["meta"])
+        bot_response = output_stream_response(response_stream, message_placeholder)
+        if not bot_response:
+            message_placeholder.markdown("生成出错")
+            st.session_state["history"].pop()
+        else:
+            if st.session_state["history"][-1]["role"] == "user":
+                role = "assistant"
+            else:
+                role = "user"
+            st.session_state["history"].append(TextMsg({"role": role, "content": bot_response}))
+        count += 1
+
 start_chat()
+
+# 展示对话历史
+for msg in st.session_state["history"]:
+    if msg["role"] == "user":
+        with st.chat_message(name="user", avatar="user"):
+            st.markdown(msg["content"])
+    elif msg["role"] == "assistant":
+        with st.chat_message(name="assistant", avatar="assistant"):
+            st.markdown(msg["content"])
+    elif msg["role"] == "image":
+        with st.chat_message(name="assistant", avatar="assistant"):
+            st.image(msg["image"], caption=msg.get("caption", None))
+    else:
+        raise Exception("Invalid role")
